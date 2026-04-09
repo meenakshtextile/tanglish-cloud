@@ -210,23 +210,26 @@ window.autoCorrect = function(){
 
   if(words.length === 0){
     alert("Words not loaded yet");
-    console.log("Words:", words);
     return;
   }
 
   let corrected = input;
 
-  words.forEach(w => {
-    const wrong = w.wrong.toLowerCase();
-    const correct = w.correct;
+  // Sort by length (important for multi-word matching first)
+  const sortedWords = [...words].sort((a,b) => 
+    b.wrong.length - a.wrong.length
+  );
 
-    const regex = new RegExp(wrong, "gi");
-    corrected = corrected.replace(regex, correct);
+  sortedWords.forEach(w => {
+
+    const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const regex = new RegExp(escaped, "gi");
+
+    corrected = corrected.replace(regex, w.correct);
   });
 
   document.getElementById("outputText").innerText = corrected;
 };
-
 
 window.addWord = async function(){
   if(!auth.currentUser) return alert("Login required");
