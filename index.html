@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tanglish Cloud Basic</title>
+<title>Tanglish Word Manager</title>
 
 <style>
 body{
@@ -57,13 +57,17 @@ button{
 
 <h2>Tanglish Word Manager</h2>
 
-<!-- ADD WORD -->
+<!-- SEARCH -->
+<h3>Search</h3>
+<input id="searchBox" placeholder="Search word...">
+
+<!-- ADD -->
 <h3>Add Word</h3>
 <input id="wrongWord" placeholder="Wrong word">
 <input id="correctWord" placeholder="Correct word">
 <button onclick="addWord()">Add</button>
 
-<!-- WORD LIST -->
+<!-- LIST -->
 <h3>Word List</h3>
 <div id="wordList"></div>
 
@@ -75,7 +79,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* 🔥 YOUR FIREBASE CONFIG (REPLACE THIS PROPERLY) */
+/* 🔥 FIREBASE CONFIG (REPLACE THIS) */
 const firebaseConfig = {
   apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
   authDomain: "tanglish-cloud.firebaseapp.com",
@@ -91,7 +95,7 @@ const db = getFirestore(app);
 
 let words = [];
 
-/* LOAD DATA REALTIME */
+/* REALTIME DATA */
 onSnapshot(collection(db, "words"), (snapshot) => {
   words = [];
 
@@ -121,16 +125,15 @@ window.addWord = async function () {
   document.getElementById("correctWord").value = "";
 };
 
-/* ❌ DELETE WORD */
+/* ❌ DELETE */
 window.deleteWord = async function (id) {
   if (confirm("Delete this word?")) {
     await deleteDoc(doc(db, "words", id));
   }
 };
 
-/* ✏️ EDIT WORD */
+/* ✏️ EDIT */
 window.editWord = async function (id, oldWrong, oldCorrect) {
-
   const newWrong = prompt("Edit wrong word:", oldWrong);
   const newCorrect = prompt("Edit correct word:", oldCorrect);
 
@@ -142,12 +145,19 @@ window.editWord = async function (id, oldWrong, oldCorrect) {
   });
 };
 
-/* 📋 DISPLAY */
+/* 📋 RENDER + SEARCH */
 function renderWords() {
   const box = document.getElementById("wordList");
+  const search = document.getElementById("searchBox").value.toLowerCase();
+
   box.innerHTML = "";
 
-  words.forEach((w) => {
+  const filtered = words.filter(w =>
+    w.wrong.toLowerCase().includes(search) ||
+    w.correct.toLowerCase().includes(search)
+  );
+
+  filtered.forEach((w) => {
     const div = document.createElement("div");
     div.className = "word-item";
 
@@ -162,6 +172,9 @@ function renderWords() {
     box.appendChild(div);
   });
 }
+
+/* 🔍 LIVE SEARCH */
+document.getElementById("searchBox").addEventListener("input", renderWords);
 
 </script>
 
