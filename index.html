@@ -2,51 +2,39 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tanglish Word Manager</title>
+<title>Tanglish Cloud</title>
+
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
 <style>
 body{
-  margin:0;
-  font-family:Segoe UI;
-  background:#111;
-  color:white;
+margin:0;
+font-family:Segoe UI;
+background:#111;
+color:white;
 }
-
 .container{
-  max-width:700px;
-  margin:40px auto;
-  padding:20px;
-  background:#222;
-  border-radius:10px;
+max-width:700px;
+margin:40px auto;
+padding:20px;
+background:#222;
+border-radius:10px;
 }
-
-input,button{
-  width:100%;
-  padding:10px;
-  margin-top:10px;
-  border:none;
-  border-radius:6px;
+input,button,textarea{
+width:100%;
+padding:10px;
+margin-top:10px;
+border-radius:6px;
+border:none;
 }
-
-button{
-  background:#667eea;
-  color:white;
-  cursor:pointer;
-}
-
+button{background:#667eea;color:white;cursor:pointer;}
 .word-item{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px;
-  background:#333;
-  margin-top:5px;
-  border-radius:6px;
-}
-
-.word-item button{
-  width:auto;
-  margin-left:5px;
+display:flex;
+justify-content:space-between;
+background:#333;
+padding:8px;
+margin-top:5px;
+border-radius:6px;
 }
 </style>
 </head>
@@ -54,32 +42,34 @@ button{
 <body>
 
 <div class="container">
+<h2>Tanglish Cloud</h2>
 
-<h2>Tanglish Word Manager</h2>
-
-<!-- SEARCH -->
 <h3>Search</h3>
-<input id="searchBox" placeholder="Search word...">
+<input id="searchBox" placeholder="search word">
 
-<!-- ADD -->
+<h3>Auto Correct</h3>
+<textarea id="textInput" rows="4"></textarea>
+<button onclick="autoCorrect()">Correct</button>
+<div id="output"></div>
+
 <h3>Add Word</h3>
-<input id="wrongWord" placeholder="Wrong word">
-<input id="correctWord" placeholder="Correct word">
+<input id="wrong">
+<input id="correct">
 <button onclick="addWord()">Add</button>
 
-<!-- LIST -->
 <h3>Word List</h3>
-<div id="wordList"></div>
-
+<div id="list"></div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+getFirestore, collection, addDoc, deleteDoc, doc,
+onSnapshot, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* 🔥 FIREBASE CONFIG (REPLACE THIS) */
+const firebaseConfig = {
 const firebaseConfig = {
   apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
   authDomain: "tanglish-cloud.firebaseapp.com",
@@ -94,87 +84,74 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let words = [];
+let fuse = null;
 
-/* REALTIME DATA */
-onSnapshot(collection(db, "words"), (snapshot) => {
-  words = [];
-
-  snapshot.forEach((d) => {
-    words.push({ id: d.id, ...d.data() });
-  });
-
-  renderWords();
+// realtime
+onSnapshot(collection(db,"words"), snap=>{
+words = snap.docs.map(d=>({id:d.id,...d.data()}));
+fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
+render();
 });
 
-/* ➕ ADD WORD */
-window.addWord = async function () {
-  const wrong = document.getElementById("wrongWord").value.trim();
-  const correct = document.getElementById("correctWord").value.trim();
-
-  if (!wrong || !correct) {
-    alert("Fill both fields");
-    return;
-  }
-
-  await addDoc(collection(db, "words"), {
-    wrong,
-    correct
-  });
-
-  document.getElementById("wrongWord").value = "";
-  document.getElementById("correctWord").value = "";
+// ADD
+window.addWord = async ()=>{
+let w=document.getElementById("wrong").value;
+let c=document.getElementById("correct").value;
+await addDoc(collection(db,"words"),{wrong:w,correct:c});
+document.getElementById("wrong").value="";
+document.getElementById("correct").value="";
 };
 
-/* ❌ DELETE */
-window.deleteWord = async function (id) {
-  if (confirm("Delete this word?")) {
-    await deleteDoc(doc(db, "words", id));
-  }
+// DELETE
+window.del = async (id)=>{
+await deleteDoc(doc(db,"words",id));
 };
 
-/* ✏️ EDIT */
-window.editWord = async function (id, oldWrong, oldCorrect) {
-  const newWrong = prompt("Edit wrong word:", oldWrong);
-  const newCorrect = prompt("Edit correct word:", oldCorrect);
-
-  if (!newWrong || !newCorrect) return;
-
-  await updateDoc(doc(db, "words", id), {
-    wrong: newWrong,
-    correct: newCorrect
-  });
+// EDIT
+window.edit = async (id)=>{
+let nw=prompt("wrong");
+let nc=prompt("correct");
+await updateDoc(doc(db,"words",id),{
+wrong:nw,
+correct:nc
+});
 };
 
-/* 📋 RENDER + SEARCH */
-function renderWords() {
-  const box = document.getElementById("wordList");
-  const search = document.getElementById("searchBox").value.toLowerCase();
+// AUTO CORRECT (FIXED)
+window.autoCorrect = ()=>{
+let text=document.getElementById("textInput").value;
+if(!text) return;
 
-  box.innerHTML = "";
+words.forEach(w=>{
+let regex=new RegExp("\\b"+w.wrong+"\\b","gi");
+text=text.replace(regex,w.correct);
+});
 
-  const filtered = words.filter(w =>
-    w.wrong.toLowerCase().includes(search) ||
-    w.correct.toLowerCase().includes(search)
-  );
+document.getElementById("output").innerText=text;
+};
 
-  filtered.forEach((w) => {
-    const div = document.createElement("div");
-    div.className = "word-item";
+// SEARCH
+document.getElementById("searchBox").addEventListener("input",function(){
+if(!fuse) return;
+let res=fuse.search(this.value);
+console.log(res);
+});
 
-    div.innerHTML = `
-      <span>${w.wrong} → ${w.correct}</span>
-      <div>
-        <button onclick="editWord('${w.id}','${w.wrong}','${w.correct}')">Edit</button>
-        <button onclick="deleteWord('${w.id}')">Delete</button>
-      </div>
-    `;
-
-    box.appendChild(div);
-  });
+// UI
+function render(){
+let box=document.getElementById("list");
+box.innerHTML="";
+words.forEach(w=>{
+box.innerHTML+=`
+<div class="word-item">
+<span>${w.wrong} → ${w.correct}</span>
+<div>
+<button onclick="edit('${w.id}')">Edit</button>
+<button onclick="del('${w.id}')">Delete</button>
+</div>
+</div>`;
+});
 }
-
-/* 🔍 LIVE SEARCH */
-document.getElementById("searchBox").addEventListener("input", renderWords);
 
 </script>
 
