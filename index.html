@@ -13,6 +13,7 @@ font-family:Segoe UI;
 background:url("https://images.unsplash.com/photo-1492724441997-5dc865305da7") no-repeat center center/cover;
 color:white;
 }
+
 body::before{
 content:"";
 position:fixed;
@@ -21,6 +22,7 @@ background:rgba(0,0,0,0.6);
 backdrop-filter:blur(6px);
 z-index:-1;
 }
+
 .container{
 max-width:750px;
 margin:40px auto;
@@ -28,6 +30,7 @@ padding:30px;
 border-radius:20px;
 background:rgba(0,0,0,0.75);
 }
+
 input,button{
 width:100%;
 padding:10px;
@@ -35,11 +38,13 @@ margin-top:10px;
 border:none;
 border-radius:8px;
 }
+
 button{
 background:#667eea;
 color:white;
 cursor:pointer;
 }
+
 .word-item{
 display:flex;
 justify-content:space-between;
@@ -48,7 +53,9 @@ padding:8px;
 margin-top:5px;
 border-radius:8px;
 }
+
 .hidden{display:none;}
+
 #loginScreen{
 position:fixed;
 inset:0;
@@ -57,6 +64,7 @@ justify-content:center;
 align-items:center;
 background:rgba(0,0,0,0.85);
 }
+
 .login-box{
 background:#111;
 padding:30px;
@@ -64,12 +72,21 @@ border-radius:15px;
 width:320px;
 text-align:center;
 }
+
+#suggestions div{
+background:#333;
+padding:6px;
+margin-top:4px;
+border-radius:6px;
+cursor:pointer;
+}
+#suggestions div:hover{background:#555;}
 </style>
 </head>
 
 <body>
 
-<!-- 🔐 LOGIN SCREEN -->
+<!-- LOGIN -->
 <div id="loginScreen">
 <div class="login-box">
 <h3>Admin Login</h3>
@@ -79,10 +96,10 @@ text-align:center;
 </div>
 </div>
 
-<!-- 🔓 MAIN APP -->
+<!-- MAIN -->
 <div id="mainApp" class="hidden">
-
 <div class="container">
+
 <h2>Tanglish Cloud</h2>
 
 <button onclick="logout()">Logout</button>
@@ -98,19 +115,22 @@ text-align:center;
 
 <h3>Word List</h3>
 <div id="wordList"></div>
-</div>
 
+</div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* 🔥 PASTE YOUR FIREBASE CONFIG */
+import {
+getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+/* 🔥 FIREBASE CONFIG */
 const firebaseConfig = {
 apiKey: "YOUR_API_KEY",
 authDomain: "YOUR_AUTH_DOMAIN",
@@ -124,122 +144,100 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let words=[];
-let fuse;
+let words = [];
+let fuse = null;
 
-/* 🔥 DEFAULT WORDS */
-const defaultWords = [
-  { wrong: "ena panra", correct: "enna panra" },
-  { wrong: "enna panre", correct: "enna panra" },
-  { wrong: "enna da", correct: "enna da" },
-  { wrong: "saptiya", correct: "saaptiya" },
-  { wrong: "epdi iruka", correct: "eppadi irukka" },
-  { wrong: "enga iruka", correct: "enge irukka" },
-  { wrong: "seri pa", correct: "sari pa" },
-  { wrong: "varuven da", correct: "varuven da" }
-];
-
-// 🔐 LOGIN
+/* LOGIN */
 window.login = async function(){
-const email=document.getElementById("email").value;
-const password=document.getElementById("password").value;
+const email = document.getElementById("email").value;
+const password = document.getElementById("password").value;
+
 try{
 await signInWithEmailAndPassword(auth,email,password);
-}catch(error){
-alert(error.message);
+}catch(e){
+alert(e.message);
 }
 };
 
-// 🔓 LOGOUT
+/* LOGOUT */
 window.logout = async function(){
 await signOut(auth);
 };
 
-// 🔁 AUTH STATE
-onAuthStateChanged(auth,(user)=>{
+/* AUTH */
+onAuthStateChanged(auth,user=>{
 if(user){
-document.getElementById("loginScreen").style.display="none";
-document.getElementById("mainApp").classList.remove("hidden");
+loginScreen.style.display="none";
+mainApp.classList.remove("hidden");
 }else{
-document.getElementById("loginScreen").style.display="flex";
-document.getElementById("mainApp").classList.add("hidden");
+loginScreen.style.display="flex";
+mainApp.classList.add("hidden");
 }
 });
 
-// 🔄 REALTIME + AUTO INSERT DEFAULT
-onSnapshot(collection(db,"words"), async snapshot=>{
-
-words=[];
-
-if(snapshot.empty){
-  for(const item of defaultWords){
-    await addDoc(collection(db,"words"), item);
-  }
-  return;
-}
-
-snapshot.forEach(docSnap=>{
-words.push({id:docSnap.id,...docSnap.data()});
+/* FIRESTORE REALTIME */
+onSnapshot(collection(db,"words"), snapshot=>{
+words = snapshot.docs.map(d=>({id:d.id,...d.data()}));
+fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
+render();
 });
 
-fuse=new Fuse(words,{keys:["wrong"],threshold:0.3});
-displayWords();
+/* ADD */
+window.addWord = async function(){
+let w = wrongWord.value.trim();
+let c = correctWord.value.trim();
+if(!w || !c) return;
 
-});
+await addDoc(collection(db,"words"),{wrong:w,correct:c});
 
-window.addWord=async function(){
-if(!auth.currentUser) return alert("Login required");
-const wrong=document.getElementById("wrongWord").value.trim();
-const correct=document.getElementById("correctWord").value.trim();
-if(!wrong||!correct) return;
-await addDoc(collection(db,"words"),{wrong,correct});
+wrongWord.value="";
+correctWord.value="";
 };
 
-window.deleteWord=async function(id){
-if(!auth.currentUser) return;
+/* DELETE */
+window.del = async function(id){
 await deleteDoc(doc(db,"words",id));
 };
 
-window.editWord=async function(id){
-if(!auth.currentUser) return;
-let newWrong=prompt("Edit wrong:");
-let newCorrect=prompt("Edit correct:");
-if(newWrong&&newCorrect){
-await updateDoc(doc(db,"words",id),{
-wrong:newWrong,
-correct:newCorrect
-});
-}
+/* EDIT */
+window.edit = async function(id){
+let nw = prompt("Wrong:");
+let nc = prompt("Correct:");
+await updateDoc(doc(db,"words",id),{wrong:nw,correct:nc});
 };
 
-function displayWords(){
-const list=document.getElementById("wordList");
-list.innerHTML="";
+/* DISPLAY */
+function render(){
+wordList.innerHTML="";
 words.forEach(w=>{
-const div=document.createElement("div");
-div.className="word-item";
-div.innerHTML=`
+wordList.innerHTML += `
+<div class="word-item">
 <span>${w.wrong} → ${w.correct}</span>
 <div>
-<button onclick="editWord('${w.id}')">Edit</button>
-<button onclick="deleteWord('${w.id}')">Delete</button>
+<button onclick="edit('${w.id}')">Edit</button>
+<button onclick="del('${w.id}')">Delete</button>
 </div>
-`;
-list.appendChild(div);
+</div>`;
 });
 }
 
-document.getElementById("searchBox").addEventListener("input",function(){
-const query=this.value;
-const box=document.getElementById("suggestions");
-box.innerHTML="";
-if(!query||!fuse) return;
-const results=fuse.search(query);
-results.slice(0,5).forEach(r=>{
-const div=document.createElement("div");
-div.innerText=r.item.correct;
-div.onclick=()=>{this.value=r.item.correct; box.innerHTML="";};
-box.appendChild(div);
+/* SEARCH + SUGGESTION */
+searchBox.addEventListener("input",function(){
+suggestions.innerHTML="";
+if(!this.value || !fuse) return;
+
+let res = fuse.search(this.value);
+
+res.slice(0,5).forEach(r=>{
+let div = document.createElement("div");
+div.innerText = r.item.correct;
+
+div.onclick = ()=>{
+searchBox.value = r.item.correct;
+suggestions.innerHTML="";
+};
+
+suggestions.appendChild(div);
 });
 });
 
