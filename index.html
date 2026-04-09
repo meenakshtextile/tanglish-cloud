@@ -119,10 +119,16 @@ from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
   const input = document.getElementById("inputText").value;
   if(!input) return;
 
+  if(words.length === 0){
+    alert("Words are still loading...");
+    return;
+  }
+
   let corrected = input;
 
   words.forEach(w => {
-    const regex = new RegExp(`\\b${w.wrong}\\b`, "gi");
+   const escapedWrong = w.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const regex = new RegExp(`\\b${escapedWrong}\\b`, "gi");
     corrected = corrected.replace(regex, w.correct);
   });
 
