@@ -123,9 +123,9 @@ background:#555;
 </div>
 
 <script type="module">
-import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  const loginScreen = document.getElementById("loginScreen");
+const mainApp = document.getElementById("mainApp");
 
-createUserWithEmailAndPassword(auth, "test@gmail.com", "123456")
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc, getDocs }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -233,8 +233,8 @@ window.autoCorrect = function(){
 
 window.addWord = async function(){
   if(!auth.currentUser) return alert("Login required");
-  const wrong=wrongWord.value.trim();
-  const correct=correctWord.value.trim();
+const wrong = document.getElementById("wrongWord").value.trim();
+const correct = document.getElementById("correctWord").value.trim();
   if(!wrong||!correct) return;
   await addDoc(collection(db,"words"),{wrong,correct});
   wrongWord.value="";
