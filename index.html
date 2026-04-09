@@ -123,7 +123,9 @@ background:#555;
 </div>
 
 <script type="module">
+import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+createUserWithEmailAndPassword(auth, "test@gmail.com", "123456")
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc, getDocs }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -198,20 +200,33 @@ onAuthStateChanged(auth,user=>{
     mainApp.classList.add("hidden");
   }
 });
-
 window.autoCorrect = function(){
-  const input=inputText.value;
-  if(!input || words.length===0) return;
-  let corrected=input;
 
-  words.forEach(w=>{
-    const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const regex=new RegExp(`\\b${escaped}\\b`,"gi");
-    corrected=corrected.replace(regex,w.correct);
+  const input = document.getElementById("inputText").value.trim();
+  if(!input){
+    alert("Please enter text");
+    return;
+  }
+
+  if(words.length === 0){
+    alert("Words not loaded yet");
+    console.log("Words:", words);
+    return;
+  }
+
+  let corrected = input;
+
+  words.forEach(w => {
+    const wrong = w.wrong.toLowerCase();
+    const correct = w.correct;
+
+    const regex = new RegExp(wrong, "gi");
+    corrected = corrected.replace(regex, correct);
   });
 
-  outputText.innerText=corrected;
+  document.getElementById("outputText").innerText = corrected;
 };
+
 
 window.addWord = async function(){
   if(!auth.currentUser) return alert("Login required");
