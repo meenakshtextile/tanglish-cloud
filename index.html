@@ -28,7 +28,7 @@ padding:30px;
 border-radius:20px;
 background:rgba(0,0,0,0.75);
 }
-input,button{
+input,button,textarea{
 width:100%;
 padding:10px;
 margin-top:10px;
@@ -40,9 +40,13 @@ background:#667eea;
 color:white;
 cursor:pointer;
 }
+button:hover{
+opacity:0.9;
+}
 .word-item{
 display:flex;
 justify-content:space-between;
+align-items:center;
 background:#222;
 padding:8px;
 margin-top:5px;
@@ -64,12 +68,22 @@ border-radius:15px;
 width:320px;
 text-align:center;
 }
+#suggestions div{
+background:#333;
+padding:6px;
+margin-top:4px;
+border-radius:6px;
+cursor:pointer;
+}
+#suggestions div:hover{
+background:#555;
+}
 </style>
 </head>
 
 <body>
 
-<!-- 🔐 LOGIN SCREEN -->
+<!-- LOGIN -->
 <div id="loginScreen">
 <div class="login-box">
 <h3>Admin Login</h3>
@@ -79,19 +93,19 @@ text-align:center;
 </div>
 </div>
 
-<!-- 🔓 MAIN APP -->
+<!-- MAIN APP -->
 <div id="mainApp" class="hidden">
-
 <div class="container">
-<h2>Tanglish Cloud</h2>
 
+<h2>Tanglish Cloud</h2>
 <button onclick="logout()">Logout</button>
 
 <h3>Search</h3>
 <input type="text" id="searchBox" placeholder="Type word...">
 <div id="suggestions"></div>
+
 <h3>Auto Correct Text</h3>
-<textarea id="inputText" placeholder="Type Tanglish sentence here..." rows="4"></textarea>
+<textarea id="inputText" rows="4" placeholder="Type Tanglish sentence..."></textarea>
 <button onclick="autoCorrect()">Correct Text</button>
 
 <h4>Corrected Output:</h4>
@@ -104,170 +118,151 @@ text-align:center;
 
 <h3>Word List</h3>
 <div id="wordList"></div>
-</div>
 
+</div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc }
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc, getDocs }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-  window.autoCorrect = function() {
-  const input = document.getElementById("inputText").value;
-  if(!input) return;
-
-  if(words.length === 0){
-    alert("Words are still loading...");
-    return;
-  }
-
-  let corrected = input;
-
-  words.forEach(w => {
-   const escapedWrong = w.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const regex = new RegExp(`\\b${escapedWrong}\\b`, "gi");
-    corrected = corrected.replace(regex, w.correct);
-  });
-
-  document.getElementById("outputText").innerText = corrected;
-};
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
-  authDomain: "tanglish-cloud.firebaseapp.com",
-  projectId: "tanglish-cloud",
-  storageBucket: "tanglish-cloud.firebasestorage.app",
-  messagingSenderId: "194420258349",
-  appId: "1:194420258349:web:97d24c1c7d8cc9e31ceaa4",
-  measurementId: "G-Y7G9XNJBH6"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let words=[];
-let fuse;
+let words = [];
+let fuse = null;
 
-/* 🔥 DEFAULT WORDS */
 const defaultWords = [
   { wrong: "ena panra", correct: "enna panra" },
-  { wrong: "enna panre", correct: "enna panra" },
-  { wrong: "enna da", correct: "enna da" },
   { wrong: "saptiya", correct: "saaptiya" },
-  { wrong: "epdi iruka", correct: "eppadi irukka" },
-  { wrong: "enga iruka", correct: "enge irukka" },
-  { wrong: "seri pa", correct: "sari pa" },
-  { wrong: "varuven da", correct: "varuven da" }
+  { wrong: "epdi iruka", correct: "eppadi irukka" }
 ];
 
-// 🔐 LOGIN
-window.login = async function(){
-const email=document.getElementById("email").value;
-const password=document.getElementById("password").value;
-try{
-await signInWithEmailAndPassword(auth,email,password);
-}catch(error){
-alert(error.message);
-}
-};
-
-// 🔓 LOGOUT
-window.logout = async function(){
-await signOut(auth);
-};
-
-// 🔁 AUTH STATE
-onAuthStateChanged(auth,(user)=>{
-if(user){
-document.getElementById("loginScreen").style.display="none";
-document.getElementById("mainApp").classList.remove("hidden");
-}else{
-document.getElementById("loginScreen").style.display="flex";
-document.getElementById("mainApp").classList.add("hidden");
-}
-});
-
-// 🔄 REALTIME + AUTO INSERT DEFAULT
-onSnapshot(collection(db,"words"), async snapshot=>{
-
-words=[];
-
-if(snapshot.empty){
-  for(const item of defaultWords){
-    await addDoc(collection(db,"words"), item);
+async function insertDefaultsIfEmpty() {
+  const snap = await getDocs(collection(db,"words"));
+  if(snap.empty){
+    for(const item of defaultWords){
+      await addDoc(collection(db,"words"), item);
+    }
   }
-  return;
 }
 
-snapshot.forEach(docSnap=>{
-words.push({id:docSnap.id,...docSnap.data()});
+insertDefaultsIfEmpty();
+
+onSnapshot(collection(db,"words"), snapshot=>{
+  words=[];
+  snapshot.forEach(docSnap=>{
+    words.push({id:docSnap.id,...docSnap.data()});
+  });
+  fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
+  displayWords();
 });
 
-fuse=new Fuse(words,{keys:["wrong"],threshold:0.3});
-displayWords();
-
-});
-
-window.addWord=async function(){
-if(!auth.currentUser) return alert("Login required");
-const wrong=document.getElementById("wrongWord").value.trim();
-const correct=document.getElementById("correctWord").value.trim();
-if(!wrong||!correct) return;
-await addDoc(collection(db,"words"),{wrong,correct});
+window.login = async function(){
+  const email=email.value;
+  const password=password.value;
+  try{
+    await signInWithEmailAndPassword(auth,email,password);
+  }catch(e){
+    alert(e.message);
+  }
 };
 
-window.deleteWord=async function(id){
-if(!auth.currentUser) return;
-await deleteDoc(doc(db,"words",id));
+window.logout = async function(){
+  await signOut(auth);
 };
 
-window.editWord=async function(id){
-if(!auth.currentUser) return;
-let newWrong=prompt("Edit wrong:");
-let newCorrect=prompt("Edit correct:");
-if(newWrong&&newCorrect){
-await updateDoc(doc(db,"words",id),{
-wrong:newWrong,
-correct:newCorrect
+onAuthStateChanged(auth,user=>{
+  if(user){
+    loginScreen.style.display="none";
+    mainApp.classList.remove("hidden");
+  }else{
+    loginScreen.style.display="flex";
+    mainApp.classList.add("hidden");
+  }
 });
-}
+
+window.autoCorrect = function(){
+  const input=inputText.value;
+  if(!input || words.length===0) return;
+  let corrected=input;
+
+  words.forEach(w=>{
+    const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const regex=new RegExp(`\\b${escaped}\\b`,"gi");
+    corrected=corrected.replace(regex,w.correct);
+  });
+
+  outputText.innerText=corrected;
+};
+
+window.addWord = async function(){
+  if(!auth.currentUser) return alert("Login required");
+  const wrong=wrongWord.value.trim();
+  const correct=correctWord.value.trim();
+  if(!wrong||!correct) return;
+  await addDoc(collection(db,"words"),{wrong,correct});
+  wrongWord.value="";
+  correctWord.value="";
+};
+
+window.deleteWord = async function(id){
+  await deleteDoc(doc(db,"words",id));
+};
+
+window.editWord = async function(id){
+  const newWrong=prompt("Edit wrong:");
+  const newCorrect=prompt("Edit correct:");
+  if(newWrong && newCorrect){
+    await updateDoc(doc(db,"words",id),{
+      wrong:newWrong,
+      correct:newCorrect
+    });
+  }
 };
 
 function displayWords(){
-const list=document.getElementById("wordList");
-list.innerHTML="";
-words.forEach(w=>{
-const div=document.createElement("div");
-div.className="word-item";
-div.innerHTML=`
-<span>${w.wrong} → ${w.correct}</span>
-<div>
-<button onclick="editWord('${w.id}')">Edit</button>
-<button onclick="deleteWord('${w.id}')">Delete</button>
-</div>
-`;
-list.appendChild(div);
-});
+  wordList.innerHTML="";
+  words.forEach(w=>{
+    const div=document.createElement("div");
+    div.className="word-item";
+    div.innerHTML=`
+      <span>${w.wrong} → ${w.correct}</span>
+      <div>
+        <button onclick="editWord('${w.id}')">Edit</button>
+        <button onclick="deleteWord('${w.id}')">Delete</button>
+      </div>
+    `;
+    wordList.appendChild(div);
+  });
 }
 
-document.getElementById("searchBox").addEventListener("input",function(){
-const query=this.value;
-const box=document.getElementById("suggestions");
-box.innerHTML="";
-if(!query||!fuse) return;
-const results=fuse.search(query);
-results.slice(0,5).forEach(r=>{
-const div=document.createElement("div");
-div.innerText=r.item.correct;
-div.onclick=()=>{this.value=r.item.correct; box.innerHTML="";};
-box.appendChild(div);
-});
+searchBox.addEventListener("input",function(){
+  suggestions.innerHTML="";
+  if(!this.value || !fuse) return;
+  const results=fuse.search(this.value);
+  results.slice(0,5).forEach(r=>{
+    const div=document.createElement("div");
+    div.innerText=r.item.correct;
+    div.onclick=()=>{
+      searchBox.value=r.item.correct;
+      suggestions.innerHTML="";
+    };
+    suggestions.appendChild(div);
+  });
 });
 
 </script>
-
 </body>
 </html>
