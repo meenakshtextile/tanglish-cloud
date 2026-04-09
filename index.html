@@ -105,14 +105,14 @@ text-align:center;
 
 </div>
 </div>
-
-<script type="module">
+  <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-const firebaseConfig = {
-/ For Firebase JS SDK v7.20.0 and later, measurementId is optional
+/* Firebase Config */
 const firebaseConfig = {
   apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
   authDomain: "tanglish-cloud.firebaseapp.com",
@@ -127,91 +127,103 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+/* UI elements */
+const loginScreen = document.getElementById("loginScreen");
+const mainApp = document.getElementById("mainApp");
+const wordList = document.getElementById("wordList");
+
 let words = [];
 
-onAuthStateChanged(auth,(user)=>{
-document.getElementById("loginScreen").style.display = user ? "none":"flex";
-document.getElementById("mainApp").classList.toggle("hidden", !user);
-});
+/* LOGIN */
+window.login = async function () {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-window.login = async () => {
-const email = document.getElementById("email").value;
-const password = document.getElementById("password").value;
-await signInWithEmailAndPassword(auth,email,password);
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (e) {
+    alert(e.message);
+  }
 };
 
-window.logout = () => signOut(auth);
+/* LOGOUT */
+window.logout = async function () {
+  await signOut(auth);
+};
 
-onSnapshot(collection(db,"words"), snap=>{
-words = [];
-snap.forEach(d=>words.push(d.data()));
+/* AUTH STATE */
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginScreen.style.display = "none";
+    mainApp.classList.remove("hidden");
+  } else {
+    loginScreen.style.display = "flex";
+    mainApp.classList.add("hidden");
+  }
 });
 
+/* LOAD WORDS */
+onSnapshot(collection(db, "words"), (snapshot) => {
+  words = [];
+  snapshot.forEach((d) => {
+    words.push({ id: d.id, ...d.data() });
+  });
+  displayWords();
+});
+
+/* AUTO CORRECT (SAFE VERSION) */
 window.autoCorrect = function () {
-  let text = document.getElementById("inputText").value;
+  let text = document.getElementById("inputText").value.toLowerCase();
 
-  if (!text) {
-    alert("Enter text");
-    return;
-  }
+  words.sort((a, b) => b.wrong.length - a.wrong.length);
 
-  if (!words || words.length === 0) {
-    alert("Words not loaded");
-    return;
-  }
+  words.forEach((w) => {
+    const regex = new RegExp(
+      "\\b" + w.wrong.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&") + "\\b",
+      "gi"
+    );
+    text = text.replace(regex, w.correct);
+  });
 
-  // Normalize
-  let clean = text
-    .toLowerCase()
-    .replace(/[^a-zA-Z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  let tokens = clean.split(" ");
-
-  let result = [];
-  let i = 0;
-
-  while (i < tokens.length) {
-
-    let bestMatch = null;
-    let bestLength = 1;
-
-    // Try 3-word, 2-word, 1-word matching
-    for (let len = 3; len >= 1; len--) {
-
-      if (i + len > tokens.length) continue;
-
-      let phrase = tokens.slice(i, i + len).join(" ");
-
-      let matches = fuse.search(phrase);
-
-      if (matches.length > 0 && matches[0].score < 0.4) {
-        bestMatch = matches[0].item.correct;
-        bestLength = len;
-        break;
-      }
-    }
-
-    if (bestMatch) {
-      result.push(bestMatch);
-      i += bestLength;
-    } else {
-      result.push(tokens[i]);
-      i++;
-    }
-  }
-
-  document.getElementById("outputText").innerText = result.join(" ");
-};
   document.getElementById("outputText").innerText = text;
 };
-window.addWord = async function(){
-const wrong = document.getElementById("wrongWord").value;
-const correct = document.getElementById("correctWord").value;
-await addDoc(collection(db,"words"),{wrong,correct});
+
+/* ADD WORD */
+window.addWord = async function () {
+  const wrong = document.getElementById("wrongWord").value.trim();
+  const correct = document.getElementById("correctWord").value.trim();
+
+  if (!wrong || !correct) return;
+
+  await addDoc(collection(db, "words"), { wrong, correct });
+
+  document.getElementById("wrongWord").value = "";
+  document.getElementById("correctWord").value = "";
 };
 
+/* DELETE */
+window.deleteWord = async function (id) {
+  await deleteDoc(doc(db, "words", id));
+};
+
+/* DISPLAY */
+function displayWords() {
+  wordList.innerHTML = "";
+
+  words.forEach((w) => {
+    const div = document.createElement("div");
+    div.className = "word-item";
+
+    div.innerHTML = `
+      <span>${w.wrong} → ${w.correct}</span>
+      <div>
+        <button onclick="deleteWord('${w.id}')">Delete</button>
+      </div>
+    `;
+
+    wordList.appendChild(div);
+  });
+}
+
 </script>
-</body>
-</html>
+
