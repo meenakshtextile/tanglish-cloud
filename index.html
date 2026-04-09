@@ -2,81 +2,69 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tanglish Cloud Secure</title>
+<title>Tanglish Cloud Fixed</title>
 
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
 <style>
 body{
-  margin:0;
-  font-family:Segoe UI;
-  background:url("https://images.unsplash.com/photo-1492724441997-5dc865305da7") no-repeat center center/cover;
-  color:white;
+margin:0;
+font-family:Segoe UI;
+background:url("https://images.unsplash.com/photo-1492724441997-5dc865305da7") no-repeat center center/cover;
+color:white;
 }
 body::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.6);
-  backdrop-filter:blur(6px);
-  z-index:-1;
+content:"";
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.6);
+backdrop-filter:blur(6px);
+z-index:-1;
 }
 .container{
-  max-width:750px;
-  margin:40px auto;
-  padding:30px;
-  border-radius:20px;
-  background:rgba(0,0,0,0.75);
+max-width:750px;
+margin:40px auto;
+padding:30px;
+border-radius:20px;
+background:rgba(0,0,0,0.75);
 }
 input,button,textarea{
-  width:100%;
-  padding:10px;
-  margin-top:10px;
-  border:none;
-  border-radius:8px;
+width:100%;
+padding:10px;
+margin-top:10px;
+border:none;
+border-radius:8px;
 }
 button{
-  background:#667eea;
-  color:white;
-  cursor:pointer;
-}
-button:hover{
-  opacity:0.9;
+background:#667eea;
+color:white;
+cursor:pointer;
 }
 .word-item{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  background:#222;
-  padding:8px;
-  margin-top:5px;
-  border-radius:8px;
+display:flex;
+justify-content:space-between;
+background:#222;
+padding:8px;
+margin-top:5px;
+border-radius:8px;
 }
 .hidden{display:none;}
+
 #loginScreen{
-  position:fixed;
-  inset:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:rgba(0,0,0,0.85);
+position:fixed;
+inset:0;
+display:flex;
+justify-content:center;
+align-items:center;
+background:rgba(0,0,0,0.85);
 }
+
 .login-box{
-  background:#111;
-  padding:30px;
-  border-radius:15px;
-  width:320px;
-  text-align:center;
-}
-#suggestions div{
-  background:#333;
-  padding:6px;
-  margin-top:4px;
-  border-radius:6px;
-  cursor:pointer;
-}
-#suggestions div:hover{
-  background:#555;
+background:#111;
+padding:30px;
+border-radius:15px;
+width:320px;
+text-align:center;
 }
 </style>
 </head>
@@ -93,220 +81,87 @@ button:hover{
   </div>
 </div>
 
-<!-- MAIN APP -->
+<!-- APP -->
 <div id="mainApp" class="hidden">
-  <div class="container">
+<div class="container">
 
-    <h2>Tanglish Cloud</h2>
-    <button onclick="logout()">Logout</button>
+<h2>Tanglish Cloud</h2>
+<button onclick="logout()">Logout</button>
 
-    <h3>Search</h3>
-    <input type="text" id="searchBox" placeholder="Type word...">
-    <div id="suggestions"></div>
+<h3>Auto Correct</h3>
+<textarea id="inputText" rows="4"></textarea>
+<button onclick="autoCorrect()">Correct</button>
 
-    <h3>Auto Correct Text</h3>
-    <textarea id="inputText" rows="4" placeholder="Type Tanglish sentence..."></textarea>
-    <button onclick="autoCorrect()">Correct Text</button>
+<h4>Output</h4>
+<div id="outputText"></div>
 
-    <h4>Corrected Output:</h4>
-    <div id="outputText" style="background:#111;padding:10px;border-radius:8px;"></div>
+<h3>Add Word</h3>
+<input id="wrongWord" placeholder="wrong">
+<input id="correctWord" placeholder="correct">
+<button onclick="addWord()">Add</button>
 
-    <h3>Add Word</h3>
-    <input type="text" id="wrongWord" placeholder="Wrong spelling">
-    <input type="text" id="correctWord" placeholder="Correct spelling">
-    <button onclick="addWord()">Add</button>
+<h3>Word List</h3>
+<div id="wordList"></div>
 
-    <h3>Word List</h3>
-    <div id="wordList"></div>
-
-  </div>
+</div>
 </div>
 
 <script type="module">
-  // Element references
-  const loginScreen = document.getElementById("loginScreen");
-  const mainApp = document.getElementById("mainApp");
-  const wordList = document.getElementById("wordList");
-  const searchBox = document.getElementById("searchBox");
-  const suggestions = document.getElementById("suggestions");
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-  // Firebase imports
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
-    authDomain: "tanglish-cloud.firebaseapp.com",
-    projectId: "tanglish-cloud",
-    storageBucket: "tanglish-cloud.firebasestorage.app",
-    messagingSenderId: "194420258349",
-    appId: "1:194420258349:web:97d24c1c7d8cc9e31ceaa4",
-    measurementId: "G-Y7G9XNJBH6"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  let words = [];
-  let fuse = null;
-
-  const defaultWords = [
-    { wrong: "ena panra", correct: "enna panra" },
-    { wrong: "saptiya", correct: "saaptiya" },
-    { wrong: "epdi iruka", correct: "eppadi irukka" }
-  ];
-
-  // Insert default words if collection empty
-  async function insertDefaultsIfEmpty() {
-    const snap = await getDocs(collection(db,"words"));
-    if(snap.empty){
-      for(const item of defaultWords){
-        await addDoc(collection(db,"words"), item);
-      }
-    }
-  }
-  insertDefaultsIfEmpty();
-
-  // Realtime snapshot
-  onSnapshot(collection(db,"words"), snapshot=>{
-    words = [];
-    snapshot.forEach(docSnap=>{
-      words.push({id:docSnap.id,...docSnap.data()});
-    });
-    fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
-    displayWords();
-  });
-
-  // LOGIN
-  window.login = async function() {
-    const emailValue = document.getElementById("email").value;
-    const passwordValue = document.getElementById("password").value;
-    try {
-      await signInWithEmailAndPassword(auth, emailValue, passwordValue);
-    } catch(error) {
-      alert(error.message);
-    }
-  };
-
-  // LOGOUT
-  window.logout = async function(){
-    await signOut(auth);
-  };
-
-  // AUTH STATE
-  onAuthStateChanged(auth, user=>{
-    if(user){
-      loginScreen.style.display="none";
-      mainApp.classList.remove("hidden");
-    } else {
-      loginScreen.style.display="flex";
-      mainApp.classList.add("hidden");
-    }
-  });
-
-  // AUTO CORRECT
-window.autoCorrect = function () {
-  let input = document.getElementById("inputText").value;
-
-  if (!input) {
-    alert("Please enter text");
-    return;
-  }
-
-  if (!fuse || words.length === 0) {
-    alert("Words not loaded yet");
-    return;
-  }
-
-  // Normalize text (lowercase, remove extra symbols but keep spaces)
-  let cleaned = input
-    .toLowerCase()
-    .replace(/[^a-zA-Z0-9\s]/g, " ")   // remove punctuation
-    .replace(/\s+/g, " ")
-    .trim();
-
-  let tokens = cleaned.split(" ");
-  let result = [...tokens];
-
-  // Try matching phrases (2-word + 3-word combinations)
-  for (let size = 3; size >= 1; size--) {
-    for (let i = 0; i <= tokens.length - size; i++) {
-
-      let phrase = tokens.slice(i, i + size).join(" ");
-
-      let match = fuse.search(phrase);
-
-      if (match.length > 0 && match[0].score < 0.4) {
-        result.splice(i, size, match[0].item.correct);
-
-        // update tokens also to avoid double replace
-        tokens.splice(i, size, match[0].item.correct.split(" "));
-      }
-    }
-  }
-
-  document.getElementById("outputText").innerText = result.join(" ");
+const firebaseConfig = {
+apiKey: "AIzaSy....",
+authDomain: "tanglish-cloud.firebaseapp.com",
+projectId: "tanglish-cloud",
+storageBucket: "tanglish-cloud.appspot.com",
+messagingSenderId: "194420258349",
+appId: "1:194420258349:web:97d24c1c7d8cc9e31ceaa4"
 };
-   
-  // ADD WORD
-  window.addWord = async function(){
-    if(!auth.currentUser) return alert("Login required");
-    const wrong = document.getElementById("wrongWord").value.trim();
-    const correct = document.getElementById("correctWord").value.trim();
-    if(!wrong||!correct) return;
-    await addDoc(collection(db,"words"),{wrong,correct});
-    document.getElementById("wrongWord").value = "";
-    document.getElementById("correctWord").value = "";
-  };
 
-  // DELETE WORD
-  window.deleteWord = async function(id){
-    await deleteDoc(doc(db,"words",id));
-  };
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-  // EDIT WORD
-  window.editWord = async function(id){
-    const newWrong = prompt("Edit wrong:");
-    const newCorrect = prompt("Edit correct:");
-    if(newWrong && newCorrect){
-      await updateDoc(doc(db,"words",id),{wrong:newWrong,correct:newCorrect});
-    }
-  };
+let words = [];
 
-  // DISPLAY WORDS
-  function displayWords(){
-    wordList.innerHTML = "";
-    words.forEach(w=>{
-      const div = document.createElement("div");
-      div.className = "word-item";
-      div.innerHTML = `
-        <span>${w.wrong} → ${w.correct}</span>
-        <div>
-          <button onclick="editWord('${w.id}')">Edit</button>
-          <button onclick="deleteWord('${w.id}')">Delete</button>
-        </div>
-      `;
-      wordList.appendChild(div);
-    });
-  }
+onAuthStateChanged(auth,(user)=>{
+document.getElementById("loginScreen").style.display = user ? "none":"flex";
+document.getElementById("mainApp").classList.toggle("hidden", !user);
+});
 
-  // SEARCH SUGGESTIONS
-  searchBox.addEventListener("input", function(){
-    suggestions.innerHTML = "";
-    if(!this.value || !fuse) return;
-    const results = fuse.search(this.value);
-    results.slice(0,5).forEach(r=>{
-      const div = document.createElement("div");
-      div.innerText = r.item.correct;
-      div.onclick = () => {
-        searchBox.value = r.item.correct;
-        suggestions.innerHTML = "";
-      };
-      suggestions.appendChild(div);
-    });
-  });
+window.login = async () => {
+const email = document.getElementById("email").value;
+const password = document.getElementById("password").value;
+await signInWithEmailAndPassword(auth,email,password);
+};
+
+window.logout = () => signOut(auth);
+
+onSnapshot(collection(db,"words"), snap=>{
+words = [];
+snap.forEach(d=>words.push(d.data()));
+});
+
+window.autoCorrect = function(){
+let text = document.getElementById("inputText").value.toLowerCase();
+
+words.sort((a,b)=>b.wrong.length - a.wrong.length);
+
+words.forEach(w=>{
+const regex = new RegExp("\\b"+w.wrong.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')+"\\b","gi");
+text = text.replace(regex, w.correct);
+});
+
+document.getElementById("outputText").innerText = text;
+};
+
+window.addWord = async function(){
+const wrong = document.getElementById("wrongWord").value;
+const correct = document.getElementById("correctWord").value;
+await addDoc(collection(db,"words"),{wrong,correct});
+};
 
 </script>
 </body>
