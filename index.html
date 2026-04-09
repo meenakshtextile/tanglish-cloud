@@ -207,23 +207,37 @@ button:hover{
   });
 
   // AUTO CORRECT
-  window.autoCorrect = function(){
-    const input = document.getElementById("inputText").value.trim();
-    if(!input){
-      alert("Please enter text");
-      return;
-    }
-    if(words.length === 0){
-      alert("Words not loaded yet");
-      return;
-    }
-    let corrected = input;
-    const sortedWords = [...words].sort((a,b)=> b.wrong.length - a.wrong.length);
-    sortedWords.forEach(w=>{
-      const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const regex = new RegExp(escaped, "gi");
-      corrected = corrected.replace(regex, w.correct);
-    });
+window.autoCorrect = function() {
+  let input = document.getElementById("inputText").value.trim();
+  if (!input) {
+    alert("Please enter text");
+    return;
+  }
+  if (words.length === 0) {
+    alert("Words not loaded yet");
+    return;
+  }
+
+  // Normalize sentence: keep spaces and basic punctuation
+  let corrected = input;
+
+  // Sort words by length descending to match multi-word phrases first
+  const sortedWords = [...words].sort((a, b) => b.wrong.length - a.wrong.length);
+
+  sortedWords.forEach(w => {
+    // Escape regex special characters
+    const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Match word boundaries or punctuation around the word
+    const regex = new RegExp(`\\b${escaped}\\b`, "gi");
+
+    // Replace all matches with correct word
+    corrected = corrected.replace(regex, w.correct);
+  });
+
+  // Display the corrected text
+  document.getElementById("outputText").innerText = corrected;
+};
     document.getElementById("outputText").innerText = corrected;
   };
 
