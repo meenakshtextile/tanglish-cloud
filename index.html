@@ -207,36 +207,47 @@ button:hover{
   });
 
   // AUTO CORRECT
-window.autoCorrect = function() {
-  let input = document.getElementById("inputText").value.trim();
+window.autoCorrect = function () {
+  let input = document.getElementById("inputText").value;
+
   if (!input) {
     alert("Please enter text");
     return;
   }
-  if (words.length === 0) {
+
+  if (!fuse || words.length === 0) {
     alert("Words not loaded yet");
     return;
   }
 
-  // Normalize sentence: keep spaces and basic punctuation
-  let corrected = input;
+  // Normalize text (lowercase, remove extra symbols but keep spaces)
+  let cleaned = input
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9\s]/g, " ")   // remove punctuation
+    .replace(/\s+/g, " ")
+    .trim();
 
-  // Sort words by length descending to match multi-word phrases first
-  const sortedWords = [...words].sort((a, b) => b.wrong.length - a.wrong.length);
+  let tokens = cleaned.split(" ");
+  let result = [...tokens];
 
-  sortedWords.forEach(w => {
-    // Escape regex special characters
-    const escaped = w.wrong.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Try matching phrases (2-word + 3-word combinations)
+  for (let size = 3; size >= 1; size--) {
+    for (let i = 0; i <= tokens.length - size; i++) {
 
-    // Match word boundaries or punctuation around the word
-    const regex = new RegExp(`\\b${escaped}\\b`, "gi");
+      let phrase = tokens.slice(i, i + size).join(" ");
 
-    // Replace all matches with correct word
-    corrected = corrected.replace(regex, w.correct);
-  });
+      let match = fuse.search(phrase);
 
-  // Display the corrected text
-  document.getElementById("outputText").innerText = corrected;
+      if (match.length > 0 && match[0].score < 0.4) {
+        result.splice(i, size, match[0].item.correct);
+
+        // update tokens also to avoid double replace
+        tokens.splice(i, size, match[0].item.correct.split(" "));
+      }
+    }
+  }
+
+  document.getElementById("outputText").innerText = result.join(" ");
 };
     document.getElementById("outputText").innerText = corrected;
   };
