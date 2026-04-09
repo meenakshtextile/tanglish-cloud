@@ -36,6 +36,16 @@ padding:8px;
 margin-top:5px;
 border-radius:6px;
 }
+  #suggestions div{
+background:#333;
+padding:8px;
+margin-top:4px;
+border-radius:6px;
+cursor:pointer;
+}
+#suggestions div:hover{
+background:#555;
+}
 </style>
 </head>
 
@@ -46,6 +56,9 @@ border-radius:6px;
 
 <h3>Search</h3>
 <input id="searchBox" placeholder="search word">
+  <h3>Search</h3>
+<input id="searchBox" placeholder="Type word...">
+<div id="suggestions"></div>
 
 <h3>Auto Correct</h3>
 <textarea id="textInput" rows="4"></textarea>
@@ -92,6 +105,10 @@ words = snap.docs.map(d=>({id:d.id,...d.data()}));
 fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
 render();
 });
+  let fuse = new Fuse(words, {
+  keys: ["wrong"],
+  threshold: 0.3
+});
 
 // ADD
 window.addWord = async ()=>{
@@ -135,6 +152,27 @@ document.getElementById("searchBox").addEventListener("input",function(){
 if(!fuse) return;
 let res=fuse.search(this.value);
 console.log(res);
+});
+  document.getElementById("searchBox").addEventListener("input", function () {
+  let box = document.getElementById("suggestions");
+  box.innerHTML = "";
+
+  if (!this.value || !fuse) return;
+
+  let results = fuse.search(this.value);
+
+  results.slice(0, 5).forEach(r => {
+    let div = document.createElement("div");
+    div.innerText = r.item.correct;
+
+    // click suggestion
+    div.onclick = () => {
+      document.getElementById("searchBox").value = r.item.correct;
+      box.innerHTML = "";
+    };
+
+    box.appendChild(div);
+  });
 });
 
 // UI
