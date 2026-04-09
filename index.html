@@ -249,9 +249,7 @@ window.autoCorrect = function () {
 
   document.getElementById("outputText").innerText = result.join(" ");
 };
-    document.getElementById("outputText").innerText = corrected;
-  };
-
+   
   // ADD WORD
   window.addWord = async function(){
     if(!auth.currentUser) return alert("Login required");
