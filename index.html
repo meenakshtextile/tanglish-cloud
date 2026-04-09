@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tanglish Cloud</title>
+<title>Tanglish Cloud Secure</title>
 
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
@@ -10,186 +10,238 @@
 body{
 margin:0;
 font-family:Segoe UI;
-background:#111;
+background:url("https://images.unsplash.com/photo-1492724441997-5dc865305da7") no-repeat center center/cover;
 color:white;
 }
-.container{
-max-width:700px;
-margin:40px auto;
-padding:20px;
-background:#222;
-border-radius:10px;
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.6);
+backdrop-filter:blur(6px);
+z-index:-1;
 }
-input,button,textarea{
+.container{
+max-width:750px;
+margin:40px auto;
+padding:30px;
+border-radius:20px;
+background:rgba(0,0,0,0.75);
+}
+input,button{
 width:100%;
 padding:10px;
 margin-top:10px;
-border-radius:6px;
 border:none;
+border-radius:8px;
 }
-button{background:#667eea;color:white;cursor:pointer;}
+button{
+background:#667eea;
+color:white;
+cursor:pointer;
+}
 .word-item{
 display:flex;
 justify-content:space-between;
-background:#333;
+background:#222;
 padding:8px;
 margin-top:5px;
-border-radius:6px;
+border-radius:8px;
 }
-  #suggestions div{
-background:#333;
-padding:8px;
-margin-top:4px;
-border-radius:6px;
-cursor:pointer;
+.hidden{display:none;}
+#loginScreen{
+position:fixed;
+inset:0;
+display:flex;
+justify-content:center;
+align-items:center;
+background:rgba(0,0,0,0.85);
 }
-#suggestions div:hover{
-background:#555;
+.login-box{
+background:#111;
+padding:30px;
+border-radius:15px;
+width:320px;
+text-align:center;
 }
 </style>
 </head>
 
 <body>
 
+<!-- 🔐 LOGIN SCREEN -->
+<div id="loginScreen">
+<div class="login-box">
+<h3>Admin Login</h3>
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+</div>
+
+<!-- 🔓 MAIN APP -->
+<div id="mainApp" class="hidden">
+
 <div class="container">
 <h2>Tanglish Cloud</h2>
 
+<button onclick="logout()">Logout</button>
+
 <h3>Search</h3>
-<input id="searchBox" placeholder="search word">
-  <h3>Search</h3>
-<input id="searchBox" placeholder="Type word...">
+<input type="text" id="searchBox" placeholder="Type word...">
 <div id="suggestions"></div>
 
-<h3>Auto Correct</h3>
-<textarea id="textInput" rows="4"></textarea>
-<button onclick="autoCorrect()">Correct</button>
-<div id="output"></div>
-
 <h3>Add Word</h3>
-<input id="wrong">
-<input id="correct">
+<input type="text" id="wrongWord" placeholder="Wrong spelling">
+<input type="text" id="correctWord" placeholder="Correct spelling">
 <button onclick="addWord()">Add</button>
 
 <h3>Word List</h3>
-<div id="list"></div>
+<div id="wordList"></div>
+</div>
+
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-getFirestore, collection, addDoc, deleteDoc, doc,
-onSnapshot, updateDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+/* 🔥 PASTE YOUR FIREBASE CONFIG */
 const firebaseConfig = {
-const firebaseConfig = {
-  apiKey: "AIzaSyAdBaim-RFyd1QhXiTkKr2RSPGxmis8mFA",
-  authDomain: "tanglish-cloud.firebaseapp.com",
-  projectId: "tanglish-cloud",
-  storageBucket: "tanglish-cloud.firebasestorage.app",
-  messagingSenderId: "194420258349",
-  appId: "1:194420258349:web:97d24c1c7d8cc9e31ceaa4",
-  measurementId: "G-Y7G9XNJBH6"
+apiKey: "YOUR_API_KEY",
+authDomain: "YOUR_AUTH_DOMAIN",
+projectId: "YOUR_PROJECT_ID",
+storageBucket: "YOUR_STORAGE_BUCKET",
+messagingSenderId: "YOUR_MSG_ID",
+appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-let words = [];
-let fuse = null;
+let words=[];
+let fuse;
 
-// realtime
-onSnapshot(collection(db,"words"), snap=>{
-words = snap.docs.map(d=>({id:d.id,...d.data()}));
-fuse = new Fuse(words,{keys:["wrong"],threshold:0.3});
-render();
-});
-  let fuse = new Fuse(words, {
-  keys: ["wrong"],
-  threshold: 0.3
-});
+/* 🔥 DEFAULT WORDS */
+const defaultWords = [
+  { wrong: "ena panra", correct: "enna panra" },
+  { wrong: "enna panre", correct: "enna panra" },
+  { wrong: "enna da", correct: "enna da" },
+  { wrong: "saptiya", correct: "saaptiya" },
+  { wrong: "epdi iruka", correct: "eppadi irukka" },
+  { wrong: "enga iruka", correct: "enge irukka" },
+  { wrong: "seri pa", correct: "sari pa" },
+  { wrong: "varuven da", correct: "varuven da" }
+];
 
-// ADD
-window.addWord = async ()=>{
-let w=document.getElementById("wrong").value;
-let c=document.getElementById("correct").value;
-await addDoc(collection(db,"words"),{wrong:w,correct:c});
-document.getElementById("wrong").value="";
-document.getElementById("correct").value="";
+// 🔐 LOGIN
+window.login = async function(){
+const email=document.getElementById("email").value;
+const password=document.getElementById("password").value;
+try{
+await signInWithEmailAndPassword(auth,email,password);
+}catch(error){
+alert(error.message);
+}
 };
 
-// DELETE
-window.del = async (id)=>{
+// 🔓 LOGOUT
+window.logout = async function(){
+await signOut(auth);
+};
+
+// 🔁 AUTH STATE
+onAuthStateChanged(auth,(user)=>{
+if(user){
+document.getElementById("loginScreen").style.display="none";
+document.getElementById("mainApp").classList.remove("hidden");
+}else{
+document.getElementById("loginScreen").style.display="flex";
+document.getElementById("mainApp").classList.add("hidden");
+}
+});
+
+// 🔄 REALTIME + AUTO INSERT DEFAULT
+onSnapshot(collection(db,"words"), async snapshot=>{
+
+words=[];
+
+if(snapshot.empty){
+  for(const item of defaultWords){
+    await addDoc(collection(db,"words"), item);
+  }
+  return;
+}
+
+snapshot.forEach(docSnap=>{
+words.push({id:docSnap.id,...docSnap.data()});
+});
+
+fuse=new Fuse(words,{keys:["wrong"],threshold:0.3});
+displayWords();
+
+});
+
+window.addWord=async function(){
+if(!auth.currentUser) return alert("Login required");
+const wrong=document.getElementById("wrongWord").value.trim();
+const correct=document.getElementById("correctWord").value.trim();
+if(!wrong||!correct) return;
+await addDoc(collection(db,"words"),{wrong,correct});
+};
+
+window.deleteWord=async function(id){
+if(!auth.currentUser) return;
 await deleteDoc(doc(db,"words",id));
 };
 
-// EDIT
-window.edit = async (id)=>{
-let nw=prompt("wrong");
-let nc=prompt("correct");
+window.editWord=async function(id){
+if(!auth.currentUser) return;
+let newWrong=prompt("Edit wrong:");
+let newCorrect=prompt("Edit correct:");
+if(newWrong&&newCorrect){
 await updateDoc(doc(db,"words",id),{
-wrong:nw,
-correct:nc
-});
-};
-
-// AUTO CORRECT (FIXED)
-window.autoCorrect = ()=>{
-let text=document.getElementById("textInput").value;
-if(!text) return;
-
-words.forEach(w=>{
-let regex=new RegExp("\\b"+w.wrong+"\\b","gi");
-text=text.replace(regex,w.correct);
-});
-
-document.getElementById("output").innerText=text;
-};
-
-// SEARCH
-document.getElementById("searchBox").addEventListener("input",function(){
-if(!fuse) return;
-let res=fuse.search(this.value);
-console.log(res);
-});
-  document.getElementById("searchBox").addEventListener("input", function () {
-  let box = document.getElementById("suggestions");
-  box.innerHTML = "";
-
-  if (!this.value || !fuse) return;
-
-  let results = fuse.search(this.value);
-
-  results.slice(0, 5).forEach(r => {
-    let div = document.createElement("div");
-    div.innerText = r.item.correct;
-
-    // click suggestion
-    div.onclick = () => {
-      document.getElementById("searchBox").value = r.item.correct;
-      box.innerHTML = "";
-    };
-
-    box.appendChild(div);
-  });
-});
-
-// UI
-function render(){
-let box=document.getElementById("list");
-box.innerHTML="";
-words.forEach(w=>{
-box.innerHTML+=`
-<div class="word-item">
-<span>${w.wrong} → ${w.correct}</span>
-<div>
-<button onclick="edit('${w.id}')">Edit</button>
-<button onclick="del('${w.id}')">Delete</button>
-</div>
-</div>`;
+wrong:newWrong,
+correct:newCorrect
 });
 }
+};
+
+function displayWords(){
+const list=document.getElementById("wordList");
+list.innerHTML="";
+words.forEach(w=>{
+const div=document.createElement("div");
+div.className="word-item";
+div.innerHTML=`
+<span>${w.wrong} → ${w.correct}</span>
+<div>
+<button onclick="editWord('${w.id}')">Edit</button>
+<button onclick="deleteWord('${w.id}')">Delete</button>
+</div>
+`;
+list.appendChild(div);
+});
+}
+
+document.getElementById("searchBox").addEventListener("input",function(){
+const query=this.value;
+const box=document.getElementById("suggestions");
+box.innerHTML="";
+if(!query||!fuse) return;
+const results=fuse.search(query);
+results.slice(0,5).forEach(r=>{
+const div=document.createElement("div");
+div.innerText=r.item.correct;
+div.onclick=()=>{this.value=r.item.correct; box.innerHTML="";};
+box.appendChild(div);
+});
+});
 
 </script>
 
