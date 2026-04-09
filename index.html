@@ -201,9 +201,8 @@ window.autoCorrect = function () {
 
   document.getElementById("outputText").innerText = result.join(" ");
 };
-
-
-
+  document.getElementById("outputText").innerText = text;
+};
 window.addWord = async function(){
 const wrong = document.getElementById("wrongWord").value;
 const correct = document.getElementById("correctWord").value;
